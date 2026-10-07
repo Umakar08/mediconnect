@@ -49,8 +49,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .submit-button { display: flex; align-items: center; justify-content: space-between; margin-top: 3px; padding: 0 17px; height: 48px; border: 0; border-radius: 8px; background: var(--teal); color: #fff; font-size: 12px; font-weight: 700; transition: background .18s; }
 .submit-button:hover, .primary-button:hover { background: var(--teal-dark); }
 .submit-button:disabled { cursor: wait; opacity: .65; }
-.demo-button { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 10px; padding: 0 13px; height: 42px; border: 1px solid #dfe9e5; border-radius: 8px; background: #fff; color: #258577; font-size: 11px; font-weight: 700; transition: background .15s, border-color .15s; }
-.demo-button:hover { border-color: #c3ded4; background: #f4faf7; }
+.preview-access-button { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 10px; padding: 0 13px; height: 42px; border: 1px solid #dfe9e5; border-radius: 8px; background: #fff; color: #258577; font-size: 11px; font-weight: 700; transition: background .15s, border-color .15s; }
+.preview-access-button:hover { border-color: #c3ded4; background: #f4faf7; }
 .status { margin: 0; padding: 11px 12px; border-radius: 7px; font-size: 11px; line-height: 1.5; }
 .status.success { background: #eaf6ef; color: #21694e; }
 .status.error { background: #fff0ed; color: #a13c2f; }

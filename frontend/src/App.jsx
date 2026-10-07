@@ -3,10 +3,10 @@ import { useMemo, useState } from 'react';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 const doctors = [
-  { id: 1, name: 'Rohith', specialty: 'Orthopedics', credentials: 'Sample profile', tagline: 'Bones, joints & movement', color: 'rose', initials: 'R', next: 'Today, 10:30 AM' },
-  { id: 2, name: 'Umakar', specialty: 'Cardiology', credentials: 'Sample profile', tagline: 'Heart & vascular care', color: 'blue', initials: 'U', next: 'Today, 11:15 AM' },
-  { id: 3, name: 'Mrudhvan', specialty: 'Dermatology', credentials: 'Sample profile', tagline: 'Skin, hair & nails', color: 'lavender', initials: 'M', next: 'Today, 1:00 PM' },
-  { id: 4, name: 'Vishnu', specialty: 'Neurology', credentials: 'Sample profile', tagline: 'Brain & nervous system', color: 'peach', initials: 'V', next: 'Tomorrow, 9:30 AM' },
+  { id: 1, name: 'Rohith', specialty: 'Orthopedics', credentials: 'Unverified profile', tagline: 'Bones, joints & movement', color: 'rose', initials: 'R', next: 'Today, 10:30 AM' },
+  { id: 2, name: 'Umakar', specialty: 'Cardiology', credentials: 'Unverified profile', tagline: 'Heart & vascular care', color: 'blue', initials: 'U', next: 'Today, 11:15 AM' },
+  { id: 3, name: 'Mrudhvan', specialty: 'Dermatology', credentials: 'Unverified profile', tagline: 'Skin, hair & nails', color: 'lavender', initials: 'M', next: 'Today, 1:00 PM' },
+  { id: 4, name: 'Vishnu', specialty: 'Neurology', credentials: 'Unverified profile', tagline: 'Brain & nervous system', color: 'peach', initials: 'V', next: 'Tomorrow, 9:30 AM' },
   { id: 5, name: 'Vinay', specialty: 'Mentalist', credentials: 'Entertainment profile', tagline: 'Mind reading & entertainment · not medical care', color: 'mint', initials: 'V', next: 'Today, 2:30 PM' },
 ];
 
@@ -121,7 +121,7 @@ function App() {
     setAppointments((existing) => [...existing, appointment].sort((a, b) => a.date.localeCompare(b.date) || appointmentMinutes(a.time) - appointmentMinutes(b.time)));
     setBookingDoctor(null);
     setSection('appointments');
-    setBookingNotice(`Your appointment with ${appointment.doctor.name} is booked.`);
+    setBookingNotice(`Saved ${appointment.doctor.name}'s illustrative time in this browser only. No appointment has been booked.`);
     window.setTimeout(() => setBookingNotice(''), 5000);
   }
 
@@ -134,8 +134,8 @@ function App() {
     setStatus({ type: '', message: '' });
   }
 
-  function enterDemo() {
-    setUser({ name: 'Jordan Lee', email: 'demo@mediconnect.example', demo: true });
+  function enterPreview() {
+    setUser({ name: 'Jordan Lee', email: 'preview@mediconnect.example', previewAccess: true });
     setSection('overview');
   }
 
@@ -170,7 +170,7 @@ function App() {
               {status.message && <p className={`status ${status.type}`} role="status">{status.message}</p>}
               <button className="submit-button" disabled={loading} type="submit">{loading ? 'Please wait...' : isRegistering ? 'Create account' : 'Sign in'} <Icon name="arrow" size={18} /></button>
             </form>
-            {!isRegistering && <button className="demo-button" type="button" onClick={enterDemo}>Explore the demo dashboard <Icon name="arrow" size={16} /></button>}
+            {!isRegistering && <button className="preview-access-button" type="button" onClick={enterPreview}>Explore the care directory <Icon name="arrow" size={16} /></button>}
             <p className="fine-print">Your information is protected and only used to support your care.</p>
           </div>
         </section>
@@ -201,7 +201,7 @@ function App() {
         </div>
         <button className="profile-button" onClick={signOut}>
           <span className="profile-avatar">{user.name.charAt(0).toUpperCase()}</span>
-          <span className="profile-copy"><strong>{user.name}</strong><small>{user.demo ? 'Demo preview' : 'Patient account'}</small></span>
+          <span className="profile-copy"><strong>{user.name}</strong><small>{user.previewAccess ? 'Preview access' : 'Patient account'}</small></span>
           <span className="profile-menu" aria-hidden="true">···</span>
         </button>
       </aside>
@@ -230,19 +230,19 @@ function App() {
 
             <section className="stat-grid" aria-label="Care overview">
               <article className="stat-card"><span className="stat-icon stat-icon-teal"><Icon name="calendar" /></span><p>Upcoming visits</p><strong>{appointments.length}</strong><small>{appointments.length ? 'You’re all set for your next visit' : 'Ready when you are'}</small></article>
-              <article className="stat-card"><span className="stat-icon stat-icon-lilac">✚</span><p>Sample departments</p><strong>{specialties.length}</strong><small>Example profile categories</small></article>
-              <article className="stat-card"><span className="stat-icon stat-icon-peach">✦</span><p>Sample doctors</p><strong>{doctors.length}</strong><small>Explore the sample care team</small></article>
+              <article className="stat-card"><span className="stat-icon stat-icon-lilac">✚</span><p>Departments</p><strong>{specialties.length}</strong><small>Profile categories</small></article>
+              <article className="stat-card"><span className="stat-icon stat-icon-peach">✦</span><p>Care profiles</p><strong>{doctors.length}</strong><small>Browse provider profiles</small></article>
             </section>
 
             <section className="section-block">
-              <div className="section-heading"><div><p className="eyebrow">Browse sample categories</p><h2>Explore departments</h2></div><button className="text-button" onClick={() => setSpecialtyAndBrowse('All specialties')}>View all <Icon name="arrow" size={16} /></button></div>
+              <div className="section-heading"><div><p className="eyebrow">Browse profile categories</p><h2>Explore departments</h2></div><button className="text-button" onClick={() => setSpecialtyAndBrowse('All specialties')}>View all <Icon name="arrow" size={16} /></button></div>
               <div className="specialty-grid">
                 {specialties.map((item, index) => <button className="specialty-card" key={item.name} onClick={() => setSpecialtyAndBrowse(item.name)}><span className={`specialty-icon specialty-${index}`}>{item.icon}</span><span className="specialty-name">{item.name}</span><span className="specialty-detail">{item.detail}</span><Icon name="arrow" size={15} /></button>)}
               </div>
             </section>
 
             <section className="section-block doctors-section">
-              <div className="section-heading"><div><p className="eyebrow">Sample profiles · not verified providers</p><h2>Meet the team</h2></div><button className="text-button" onClick={() => setSection('doctors')}>See all profiles <Icon name="arrow" size={16} /></button></div>
+              <div className="section-heading"><div><p className="eyebrow">Fictional profiles · not verified providers</p><h2>Meet the team</h2></div><button className="text-button" onClick={() => setSection('doctors')}>See all profiles <Icon name="arrow" size={16} /></button></div>
               <div className="doctor-grid">{doctors.slice(0, 3).map((doctor) => <DoctorCard doctor={doctor} key={doctor.id} onBook={openBooking} />)}</div>
             </section>
 
@@ -256,7 +256,7 @@ function App() {
 
         {section === 'doctors' && (
           <div className="page-content">
-            <section className="welcome-row directory-heading"><div><p className="eyebrow">Fictional demonstration profiles</p><h1>Meet the team</h1><p className="page-subtitle">Names and schedules are examples, not verified medical providers. Mentalism is entertainment, not medical care.</p></div><div className="directory-count"><strong>{filteredDoctors.length}</strong><span>sample profiles</span></div></section>
+            <section className="welcome-row directory-heading"><div><p className="eyebrow">Fictional profiles · not verified providers</p><h1>Meet the team</h1><p className="page-subtitle">These names and availability are fictional and are not verified medical providers. Listed times are illustrative only. Mentalism is entertainment, not medical care.</p></div><div className="directory-count"><strong>{filteredDoctors.length}</strong><span>profiles</span></div></section>
             <div className="filter-row"><div className="filter-pills" aria-label="Filter by department"><button className={specialty === 'All specialties' ? 'selected' : ''} onClick={() => setSpecialty('All specialties')}>All profiles</button>{specialties.map((item) => <button key={item.name} className={specialty === item.name ? 'selected' : ''} onClick={() => setSpecialty(item.name)}>{item.name}</button>)}</div></div>
             {filteredDoctors.length ? <div className="doctor-grid directory-grid">{filteredDoctors.map((doctor) => <DoctorCard doctor={doctor} key={doctor.id} onBook={openBooking} />)}</div> : <div className="empty-state"><span className="empty-calendar"><Icon name="search" size={23} /></span><h2>No doctors found</h2><p>Try another name or choose a different specialty.</p><button className="outline-button" onClick={() => { setSearch(''); setSpecialty('All specialties'); }}>Clear filters</button></div>}
             <footer className="page-footer">MediConnect · A little more care, a little more connected.</footer>
@@ -265,7 +265,7 @@ function App() {
 
         {section === 'appointments' && (
           <div className="page-content">
-            <section className="welcome-row"><div><p className="eyebrow">Your demo calendar</p><h1>Appointments</h1><p className="page-subtitle">Demo bookings stay in this browser session; they are not saved to a clinic.</p></div><button className="primary-button" onClick={() => setSection('doctors')}><Icon name="plus" size={17} /> Book a demo time</button></section>
+            <section className="welcome-row"><div><p className="eyebrow">Your schedule planner</p><h1>Appointments</h1><p className="page-subtitle">Saved entries stay in this browser session. They do not contact a clinic or create real appointments.</p></div><button className="primary-button" onClick={() => setSection('doctors')}><Icon name="plus" size={17} /> Choose a time</button></section>
             {bookingNotice && <div className="booking-notice" role="status"><span><Icon name="check" size={17} /></span>{bookingNotice}</div>}
             {appointments.length ? <div className="appointment-page-list"><AppointmentList appointments={appointments} /></div> : <div className="empty-state appointment-empty"><span className="empty-calendar"><Icon name="calendar" size={24} /></span><h2>Your next visit starts here</h2><p>Browse our care team and book a time that works for you.</p><button className="primary-button" onClick={() => setSection('doctors')}><Icon name="search" size={17} /> Find a doctor</button></div>}
             <footer className="page-footer">MediConnect · A little more care, a little more connected.</footer>
@@ -275,14 +275,14 @@ function App() {
 
       {bookingDoctor && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setBookingDoctor(null); }}>
         <section className="booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
-          <div className="modal-top"><span className="modal-kicker">BOOK A VISIT</span><button className="icon-button modal-close" onClick={() => setBookingDoctor(null)} aria-label="Close booking"><Icon name="close" /></button></div>
-          <h2 id="booking-title">Let’s find a time.</h2><p className="modal-intro">Choose a date and time for your appointment.</p>
-          <div className="booking-doctor"><DoctorAvatar doctor={bookingDoctor} /><div><strong>{bookingDoctor.name}</strong><span>{bookingDoctor.specialty} · {bookingDoctor.credentials}</span></div><span className="availability-dot" title="Sample profile" /></div>
+          <div className="modal-top"><span className="modal-kicker">SCHEDULE PLANNER</span><button className="icon-button modal-close" onClick={() => setBookingDoctor(null)} aria-label="Close booking"><Icon name="close" /></button></div>
+          <h2 id="booking-title">Choose a time.</h2><p className="modal-intro">Add a time to your personal planner.</p>
+          <div className="booking-doctor"><DoctorAvatar doctor={bookingDoctor} /><div><strong>{bookingDoctor.name}</strong><span>{bookingDoctor.specialty} · {bookingDoctor.credentials}</span></div><span className="availability-dot" title="Illustrative time" /></div>
           <form className="booking-form" onSubmit={confirmBooking}>
             <label>Appointment date<input type="date" value={bookingDate} onChange={(event) => setBookingDate(event.target.value)} min={new Date().toLocaleDateString('en-CA')} required /></label>
             <label>Available time<select value={bookingTime} onChange={(event) => setBookingTime(event.target.value)} required><option value="">Choose a time</option><option>9:00 AM</option><option>10:30 AM</option><option>11:15 AM</option><option>1:00 PM</option><option>2:30 PM</option><option>3:45 PM</option></select></label>
-            <p className="booking-disclaimer">{bookingDoctor.specialty === 'Mentalist' ? 'Vinay is an entertainment profile, not a medical or mental-health provider. This demo booking is not a healthcare appointment.' : 'This demo booking is for a fictional, unverified profile and stays in your current session only.'}</p>
-            <button className="primary-button modal-submit" type="submit"><Icon name="calendar" size={17} /> Confirm demo booking</button>
+            <p className="booking-disclaimer">{bookingDoctor.specialty === 'Mentalist' ? 'Vinay is an entertainment profile, not a medical or mental-health provider. The listed time is illustrative; saving it does not create an appointment.' : 'This profile is fictional and unverified. Saving a time does not contact a clinic or create a real appointment; your entry stays in this browser session.'}</p>
+            <button className="primary-button modal-submit" type="submit"><Icon name="calendar" size={17} /> Save to planner</button>
           </form>
         </section>
       </div>}
@@ -293,7 +293,7 @@ function App() {
 function DoctorCard({ doctor, onBook }) {
   return (
     <article className="doctor-card">
-      <div className="doctor-card-top"><DoctorAvatar doctor={doctor} large /><span className="availability-pill"><i /> Sample schedule</span></div>
+      <div className="doctor-card-top"><DoctorAvatar doctor={doctor} large /><span className="availability-pill"><i /> Illustrative time</span></div>
       <h3>{doctor.name}</h3><p className="doctor-specialty">{doctor.specialty} <span>·</span> {doctor.credentials}</p>
       <p className="doctor-tagline">{doctor.tagline}</p>
       <div className="doctor-next"><span><Icon name="clock" size={15} /> Next available</span><strong>{doctor.next}</strong></div>
@@ -305,7 +305,7 @@ function DoctorCard({ doctor, onBook }) {
 function AppointmentList({ appointments }) {
   return <div className="appointment-list">{appointments.map((appointment) => {
     const date = new Date(`${appointment.date}T12:00:00`);
-    return <article className="appointment-card" key={appointment.id}><div className="appointment-date"><strong>{date.toLocaleDateString('en-US', { day: '2-digit' })}</strong><span>{date.toLocaleDateString('en-US', { month: 'short' })}</span></div><DoctorAvatar doctor={appointment.doctor} /><div className="appointment-info"><strong>{appointment.doctor.name}</strong><span>{appointment.doctor.specialty} · Demo appointment</span></div><div className="appointment-time"><span><Icon name="clock" size={15} /> {appointment.time}</span><span><Icon name="pin" size={15} /> Sample schedule</span></div><span className="appointment-status"><i /> Demo booking</span></article>;
+    return <article className="appointment-card" key={appointment.id}><div className="appointment-date"><strong>{date.toLocaleDateString('en-US', { day: '2-digit' })}</strong><span>{date.toLocaleDateString('en-US', { month: 'short' })}</span></div><DoctorAvatar doctor={appointment.doctor} /><div className="appointment-info"><strong>{appointment.doctor.name}</strong><span>{appointment.doctor.specialty} · Planner entry</span></div><div className="appointment-time"><span><Icon name="clock" size={15} /> {appointment.time}</span><span><Icon name="pin" size={15} /> Illustrative time</span></div><span className="appointment-status"><i /> Saved locally</span></article>;
   })}</div>;
 }
 
