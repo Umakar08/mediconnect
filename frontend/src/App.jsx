@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import PatientCare from './PatientCare.jsx';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
@@ -38,6 +39,8 @@ function Icon({ name, size = 18 }) {
     check: <path d="m5 12 4 4L19 6" />,
     star: <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z" />,
     video: <><rect x="3" y="6" width="13" height="12" rx="2" /><path d="m16 10 5-3v10l-5-3" /></>,
+    flask: <><path d="M9 3h6M10 3v7l-5.5 9.2A1.8 1.8 0 0 0 6 22h12a1.8 1.8 0 0 0 1.5-2.8L14 10V3" /><path d="M8 16h8" /></>,
+    bed: <><path d="M3 19v-8M3 16h18v3M21 19v-8M3 13h5a3 3 0 0 1 3 3M11 16V9h6a4 4 0 0 1 4 4" /></>,
   };
 
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
@@ -53,6 +56,7 @@ function App() {
   const [status, setStatus] = useState({ type: '', message: '' });
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
+  const [authChecking, setAuthChecking] = useState(true);
   const [section, setSection] = useState('overview');
   const [search, setSearch] = useState('');
   const [specialty, setSpecialty] = useState('All specialties');
@@ -62,6 +66,22 @@ function App() {
   const [appointments, setAppointments] = useState([]);
   const [bookingNotice, setBookingNotice] = useState('');
   const isRegistering = mode === 'register';
+
+  useEffect(() => {
+    const token = window.sessionStorage.getItem('mediconnect-token');
+    if (!token) {
+      setAuthChecking(false);
+      return;
+    }
+    fetch(`${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Your session has expired.');
+        const data = await response.json();
+        setUser({ name: data.name, email: data.email, role: data.role, accessToken: token });
+      })
+      .catch(() => window.sessionStorage.removeItem('mediconnect-token'))
+      .finally(() => setAuthChecking(false));
+  }, []);
 
   const filteredDoctors = useMemo(() => doctors.filter((doctor) => {
     const matchesSearch = `${doctor.name} ${doctor.specialty}`.toLowerCase().includes(search.trim().toLowerCase());
@@ -94,7 +114,9 @@ function App() {
         setStatus({ type: 'success', message: 'Your account is ready. Sign in to continue.' });
         setMode('login');
       } else {
-        setUser({ name: data.name || form.email.split('@')[0], email: data.email || form.email });
+        if (!data.accessToken) throw new Error('The server did not return a sign-in token.');
+        window.sessionStorage.setItem('mediconnect-token', data.accessToken);
+        setUser({ name: data.name || form.email.split('@')[0], email: data.email || form.email, role: data.role, accessToken: data.accessToken });
         setSection('overview');
       }
     } catch (error) {
@@ -126,6 +148,13 @@ function App() {
   }
 
   function signOut() {
+    if (user?.accessToken) {
+      void fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${user.accessToken}` },
+      });
+    }
+    window.sessionStorage.removeItem('mediconnect-token');
     setUser(null);
     setAppointments([]);
     setSearch('');
@@ -137,6 +166,10 @@ function App() {
   function enterPreview() {
     setUser({ name: 'Jordan Lee', email: 'preview@mediconnect.example', previewAccess: true });
     setSection('overview');
+  }
+
+  if (!user && authChecking) {
+    return <main className="auth-shell"><p className="page-subtitle">Checking your sign-in…</p></main>;
   }
 
   if (!user) {
@@ -192,6 +225,8 @@ function App() {
           <button className={section === 'overview' ? 'active' : ''} onClick={() => setSection('overview')}><Icon name="grid" /> Overview</button>
           <button className={section === 'doctors' ? 'active' : ''} onClick={() => { setSpecialty('All specialties'); setSection('doctors'); }}><span className="nav-symbol">✚</span> Find a doctor</button>
           <button className={section === 'appointments' ? 'active' : ''} onClick={() => setSection('appointments')}><Icon name="calendar" /> Appointments{appointments.length > 0 && <span className="nav-count">{appointments.length}</span>}</button>
+          {!user.previewAccess && <button className={section === 'reports' ? 'active' : ''} onClick={() => setSection('reports')}><Icon name="flask" /> Reports</button>}
+          {!user.previewAccess && <button className={section === 'admissions' ? 'active' : ''} onClick={() => setSection('admissions')}><Icon name="bed" /> {user.role === 'PATIENT' ? 'Admissions' : 'Bed management'}</button>}
         </nav>
         <div className="sidebar-help">
           <div className="help-icon">✦</div>
@@ -208,7 +243,7 @@ function App() {
 
       <main className="main-content">
         <header className="topbar">
-          <div className="breadcrumb"><span>Workspace</span><span>/</span><strong>{section === 'overview' ? 'Overview' : section === 'doctors' ? 'Find a doctor' : 'Appointments'}</strong></div>
+          <div className="breadcrumb"><span>Workspace</span><span>/</span><strong>{section === 'overview' ? 'Overview' : section === 'doctors' ? 'Find a doctor' : section === 'appointments' ? 'Appointments' : section === 'reports' ? 'Blood test reports' : 'Admissions'}</strong></div>
           <div className="topbar-actions">
             <label className="search-box"><Icon name="search" size={18} /><input aria-label="Search doctors" value={search} onChange={(event) => { setSearch(event.target.value); if (event.target.value) setSection('doctors'); }} placeholder="Search doctors..." /><kbd>⌘ K</kbd></label>
             <button className="icon-button notification-button" aria-label="Notifications"><Icon name="bell" size={19} /><span /></button>
@@ -270,6 +305,10 @@ function App() {
             {appointments.length ? <div className="appointment-page-list"><AppointmentList appointments={appointments} /></div> : <div className="empty-state appointment-empty"><span className="empty-calendar"><Icon name="calendar" size={24} /></span><h2>Your next visit starts here</h2><p>Browse our care team and book a time that works for you.</p><button className="primary-button" onClick={() => setSection('doctors')}><Icon name="search" size={17} /> Find a doctor</button></div>}
             <footer className="page-footer">MediConnect · A little more care, a little more connected.</footer>
           </div>
+        )}
+
+        {(section === 'reports' || section === 'admissions') && !user.previewAccess && (
+          <PatientCare token={user.accessToken} role={user.role} section={section} />
         )}
       </main>
 

@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -25,10 +26,10 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-            FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain) throws ServletException, IOException {
         String suppliedApiKey = request.getHeader(API_KEY_HEADER);
-        if (isValid(suppliedApiKey)) {
+        if (SecurityContextHolder.getContext().getAuthentication() == null && isValid(suppliedApiKey)) {
             var authentication = new UsernamePasswordAuthenticationToken(
                     "api-key-client", null, AuthorityUtils.NO_AUTHORITIES);
             SecurityContextHolder.getContext().setAuthentication(authentication);
