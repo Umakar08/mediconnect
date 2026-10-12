@@ -13,20 +13,15 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/patient")
-@CrossOrigin(origins = { "http://localhost:5173", "http://localhost:5174",
-        "https://frontend-three-rho-24.vercel.app" })
 public class PatientCareController {
     private final LabReportService labReportService;
     private final AdmissionService admissionService;
@@ -44,12 +39,6 @@ public class PatientCareController {
     @GetMapping("/lab-reports")
     public List<CareResponses.LabReportFile> reports(@AuthenticationPrincipal User patient) {
         return labReportService.patientFiles(patient);
-    }
-
-    @PostMapping(value = "/lab-reports", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public CareResponses.LabReportFile upload(
-            @AuthenticationPrincipal User patient, @RequestPart("file") MultipartFile file) {
-        return labReportService.upload(patient, file);
     }
 
     @GetMapping("/lab-reports/{reportId}/download")

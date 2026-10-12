@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import PatientCare from './PatientCare.jsx';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const doctors = [
-  { id: 1, name: 'Rohith', specialty: 'Orthopedics', credentials: 'Unverified profile', tagline: 'Bones, joints & movement', color: 'rose', initials: 'R', next: 'Today, 10:30 AM' },
-  { id: 2, name: 'Umakar', specialty: 'Cardiology', credentials: 'Unverified profile', tagline: 'Heart & vascular care', color: 'blue', initials: 'U', next: 'Today, 11:15 AM' },
-  { id: 3, name: 'Mrudhvan', specialty: 'Dermatology', credentials: 'Unverified profile', tagline: 'Skin, hair & nails', color: 'lavender', initials: 'M', next: 'Today, 1:00 PM' },
-  { id: 4, name: 'Vishnu', specialty: 'Neurology', credentials: 'Unverified profile', tagline: 'Brain & nervous system', color: 'peach', initials: 'V', next: 'Tomorrow, 9:30 AM' },
-  { id: 5, name: 'Vinay', specialty: 'Mentalist', credentials: 'Entertainment profile', tagline: 'Mind reading & entertainment · not medical care', color: 'mint', initials: 'V', next: 'Today, 2:30 PM' },
+  { id: 1, name: 'Rohith', specialty: 'Orthopedics', credentials: 'Unverified profile', tagline: 'Bones, joints & movement', color: 'rose', initials: 'R' },
+  { id: 2, name: 'Umakar', specialty: 'Cardiology', credentials: 'Unverified profile', tagline: 'Heart & vascular care', color: 'blue', initials: 'U' },
+  { id: 3, name: 'Mrudhvan', specialty: 'Dermatology', credentials: 'Unverified profile', tagline: 'Skin, hair & nails', color: 'lavender', initials: 'M' },
+  { id: 4, name: 'Vishnu', specialty: 'Neurology', credentials: 'Unverified profile', tagline: 'Brain & nervous system', color: 'peach', initials: 'V' },
+  { id: 5, name: 'Vinay', specialty: 'Mentalist', credentials: 'Entertainment profile', tagline: 'Mind reading & entertainment · not medical care', color: 'mint', initials: 'V' },
 ];
 
 const specialties = [
@@ -23,6 +23,19 @@ function appointmentMinutes(time) {
   const [clock, period] = time.split(' ');
   const [hour, minute] = clock.split(':').map(Number);
   return (hour % 12 + (period === 'PM' ? 12 : 0)) * 60 + minute;
+}
+
+function createRandomAvailabilityTimes() {
+  const availableMinutes = Array.from({ length: 16 }, (_, index) => 9 * 60 + index * 30);
+  for (let index = availableMinutes.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [availableMinutes[index], availableMinutes[randomIndex]] = [availableMinutes[randomIndex], availableMinutes[index]];
+  }
+  return availableMinutes.slice(0, 5).sort((a, b) => a - b).map((minutes) => {
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`;
+  });
 }
 
 function Icon({ name, size = 18 }) {
@@ -61,11 +74,15 @@ function App() {
   const [search, setSearch] = useState('');
   const [specialty, setSpecialty] = useState('All specialties');
   const [bookingDoctor, setBookingDoctor] = useState(null);
+  const [availabilityByDoctor] = useState(() => Object.fromEntries(
+    doctors.map((doctor) => [doctor.id, createRandomAvailabilityTimes()]),
+  ));
   const [bookingDate, setBookingDate] = useState('');
   const [bookingTime, setBookingTime] = useState('');
   const [appointments, setAppointments] = useState([]);
   const [bookingNotice, setBookingNotice] = useState('');
   const isRegistering = mode === 'register';
+  const isStaffLogin = mode === 'staff-login';
 
   useEffect(() => {
     const token = window.sessionStorage.getItem('mediconnect-token');
@@ -78,10 +95,15 @@ function App() {
         if (!response.ok) throw new Error('Your session has expired.');
         const data = await response.json();
         setUser({ name: data.name, email: data.email, role: data.role, accessToken: token });
+        if (data.role === 'STAFF' || data.role === 'ADMIN') setSection('reports');
       })
       .catch(() => window.sessionStorage.removeItem('mediconnect-token'))
       .finally(() => setAuthChecking(false));
   }, []);
+
+  useEffect(() => {
+    if (user?.role === 'STAFF' && section !== 'reports') setSection('reports');
+  }, [user, section]);
 
   const filteredDoctors = useMemo(() => doctors.filter((doctor) => {
     const matchesSearch = `${doctor.name} ${doctor.specialty}`.toLowerCase().includes(search.trim().toLowerCase());
@@ -98,7 +120,8 @@ function App() {
     setLoading(true);
     setStatus({ type: '', message: '' });
     try {
-      const response = await fetch(`${API_URL}/auth/${isRegistering ? 'register' : 'login'}`, {
+      const endpoint = isRegistering ? '/auth/register' : isStaffLogin ? '/auth/staff/login' : '/auth/login';
+      const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(isRegistering ? form : { email: form.email, password: form.password }),
@@ -117,7 +140,7 @@ function App() {
         if (!data.accessToken) throw new Error('The server did not return a sign-in token.');
         window.sessionStorage.setItem('mediconnect-token', data.accessToken);
         setUser({ name: data.name || form.email.split('@')[0], email: data.email || form.email, role: data.role, accessToken: data.accessToken });
-        setSection('overview');
+        setSection(data.role === 'STAFF' || data.role === 'ADMIN' ? 'reports' : 'overview');
       }
     } catch (error) {
       setStatus({ type: 'error', message: error.message.includes('Failed to fetch') ? 'Could not reach the server. Make sure the backend is running.' : error.message });
@@ -131,6 +154,8 @@ function App() {
     setBookingDate('');
     setBookingTime('');
   }
+
+  const availableTimes = bookingDoctor ? availabilityByDoctor[bookingDoctor.id] : [];
 
   function confirmBooking(event) {
     event.preventDefault();
@@ -163,11 +188,6 @@ function App() {
     setStatus({ type: '', message: '' });
   }
 
-  function enterPreview() {
-    setUser({ name: 'Jordan Lee', email: 'preview@mediconnect.example', previewAccess: true });
-    setSection('overview');
-  }
-
   if (!user && authChecking) {
     return <main className="auth-shell"><p className="page-subtitle">Checking your sign-in…</p></main>;
   }
@@ -189,21 +209,21 @@ function App() {
           <div className="auth-panel">
             <div className="auth-heading">
               <p className="eyebrow">Your care, all in one place</p>
-              <h2>{isRegistering ? 'Create your account' : 'Welcome back'}</h2>
-              <p>{isRegistering ? 'A healthier you is just around the corner.' : 'Sign in to pick up where you left off.'}</p>
+              <h2>{isRegistering ? 'Create your account' : isStaffLogin ? 'Staff sign in' : 'Welcome back'}</h2>
+              <p>{isRegistering ? 'A healthier you is just around the corner.' : isStaffLogin ? 'Sign in to add reports to patient records.' : 'Sign in to pick up where you left off.'}</p>
             </div>
             <div className="tabs" role="tablist" aria-label="Account access">
               <button className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setStatus({ type: '', message: '' }); }} type="button" role="tab" aria-selected={mode === 'login'}>Sign in</button>
               <button className={mode === 'register' ? 'active' : ''} onClick={() => { setMode('register'); setStatus({ type: '', message: '' }); }} type="button" role="tab" aria-selected={mode === 'register'}>Create account</button>
+              <button className={isStaffLogin ? 'active' : ''} onClick={() => { setMode('staff-login'); setStatus({ type: '', message: '' }); }} type="button" role="tab" aria-selected={isStaffLogin}>Staff login</button>
             </div>
             <form onSubmit={submit}>
               {isRegistering && <label>Full name<input name="name" value={form.name} onChange={updateField} placeholder="Your name" autoComplete="name" required /></label>}
               <label>Email address<input name="email" type="email" value={form.email} onChange={updateField} placeholder="you@example.com" autoComplete="email" required /></label>
               <label>Password<input name="password" type="password" value={form.password} onChange={updateField} placeholder="At least 8 characters" autoComplete={isRegistering ? 'new-password' : 'current-password'} minLength={isRegistering ? 8 : undefined} required /></label>
               {status.message && <p className={`status ${status.type}`} role="status">{status.message}</p>}
-              <button className="submit-button" disabled={loading} type="submit">{loading ? 'Please wait...' : isRegistering ? 'Create account' : 'Sign in'} <Icon name="arrow" size={18} /></button>
+              <button className="submit-button" disabled={loading} type="submit">{loading ? 'Please wait...' : isRegistering ? 'Create account' : isStaffLogin ? 'Staff sign in' : 'Sign in'} <Icon name="arrow" size={18} /></button>
             </form>
-            {!isRegistering && <button className="preview-access-button" type="button" onClick={enterPreview}>Explore the care directory <Icon name="arrow" size={16} /></button>}
             <p className="fine-print">Your information is protected and only used to support your care.</p>
           </div>
         </section>
@@ -219,14 +239,18 @@ function App() {
   return (
     <div className="dashboard-shell">
       <aside className="sidebar">
-        <a className="brand-lockup sidebar-brand" href="#" onClick={(event) => { event.preventDefault(); setSection('overview'); }}><span className="brand-mark">m</span><span>MediConnect</span></a>
+        <a className="brand-lockup sidebar-brand" href="#" onClick={(event) => { event.preventDefault(); setSection(user.role === 'STAFF' ? 'reports' : 'overview'); }}><span className="brand-mark">m</span><span>MediConnect</span></a>
         <div className="side-caption">MENU</div>
         <nav className="side-nav" aria-label="Main navigation">
-          <button className={section === 'overview' ? 'active' : ''} onClick={() => setSection('overview')}><Icon name="grid" /> Overview</button>
-          <button className={section === 'doctors' ? 'active' : ''} onClick={() => { setSpecialty('All specialties'); setSection('doctors'); }}><span className="nav-symbol">✚</span> Find a doctor</button>
-          <button className={section === 'appointments' ? 'active' : ''} onClick={() => setSection('appointments')}><Icon name="calendar" /> Appointments{appointments.length > 0 && <span className="nav-count">{appointments.length}</span>}</button>
-          {!user.previewAccess && <button className={section === 'reports' ? 'active' : ''} onClick={() => setSection('reports')}><Icon name="flask" /> Reports</button>}
-          {!user.previewAccess && <button className={section === 'admissions' ? 'active' : ''} onClick={() => setSection('admissions')}><Icon name="bed" /> {user.role === 'PATIENT' ? 'Admissions' : 'Bed management'}</button>}
+          {user.role !== 'STAFF' && <>
+            <button className={section === 'overview' ? 'active' : ''} onClick={() => setSection('overview')}><Icon name="grid" /> Overview</button>
+            <button className={section === 'doctors' ? 'active' : ''} onClick={() => { setSpecialty('All specialties'); setSection('doctors'); }}><span className="nav-symbol">✚</span> Find a doctor</button>
+            <button className={section === 'appointments' ? 'active' : ''} onClick={() => setSection('appointments')}><Icon name="calendar" /> Appointments{appointments.length > 0 && <span className="nav-count">{appointments.length}</span>}</button>
+          </>}
+          <button className={section === 'reports' ? 'active' : ''} onClick={() => setSection('reports')}><Icon name="flask" /> Reports</button>
+          {user.role !== 'STAFF' && <button className={section === 'admissions' ? 'active' : ''} onClick={() => setSection('admissions')}><Icon name="bed" /> {user.role === 'PATIENT' ? 'Admissions' : 'Bed management'}</button>}
+          {user.role === 'STAFF' && <button className={section === 'admissions' ? 'active' : ''} onClick={() => setSection('admissions')}><Icon name="bed" /> Admissions</button>}
+          {user.role === 'ADMIN' && <button className={section === 'staff' ? 'active' : ''} onClick={() => setSection('staff')}><Icon name="plus" /> Create staff</button>}
         </nav>
         <div className="sidebar-help">
           <div className="help-icon">✦</div>
@@ -236,16 +260,16 @@ function App() {
         </div>
         <button className="profile-button" onClick={signOut}>
           <span className="profile-avatar">{user.name.charAt(0).toUpperCase()}</span>
-          <span className="profile-copy"><strong>{user.name}</strong><small>{user.previewAccess ? 'Preview access' : 'Patient account'}</small></span>
+          <span className="profile-copy"><strong>{user.name}</strong><small>{user.role === 'STAFF' ? 'Staff account' : user.role === 'ADMIN' ? 'Main staff' : 'Patient account'}</small></span>
           <span className="profile-menu" aria-hidden="true">···</span>
         </button>
       </aside>
 
       <main className="main-content">
         <header className="topbar">
-          <div className="breadcrumb"><span>Workspace</span><span>/</span><strong>{section === 'overview' ? 'Overview' : section === 'doctors' ? 'Find a doctor' : section === 'appointments' ? 'Appointments' : section === 'reports' ? 'Blood test reports' : 'Admissions'}</strong></div>
+          <div className="breadcrumb"><span>Workspace</span><span>/</span><strong>{section === 'overview' ? 'Overview' : section === 'doctors' ? 'Find a doctor' : section === 'appointments' ? 'Appointments' : section === 'reports' ? 'Blood test reports' : section === 'staff' ? 'Create staff account' : user.role === 'STAFF' ? 'Admission requests' : 'Admissions'}</strong></div>
           <div className="topbar-actions">
-            <label className="search-box"><Icon name="search" size={18} /><input aria-label="Search doctors" value={search} onChange={(event) => { setSearch(event.target.value); if (event.target.value) setSection('doctors'); }} placeholder="Search doctors..." /><kbd>⌘ K</kbd></label>
+            {user.role !== 'STAFF' && <label className="search-box"><Icon name="search" size={18} /><input aria-label="Search doctors" value={search} onChange={(event) => { setSearch(event.target.value); if (event.target.value) setSection('doctors'); }} placeholder="Search doctors..." /><kbd>⌘ K</kbd></label>}
             <button className="icon-button notification-button" aria-label="Notifications"><Icon name="bell" size={19} /><span /></button>
             <span className="topbar-avatar">{user.name.charAt(0).toUpperCase()}</span>
           </div>
@@ -278,7 +302,7 @@ function App() {
 
             <section className="section-block doctors-section">
               <div className="section-heading"><div><p className="eyebrow">Fictional profiles · not verified providers</p><h2>Meet the team</h2></div><button className="text-button" onClick={() => setSection('doctors')}>See all profiles <Icon name="arrow" size={16} /></button></div>
-              <div className="doctor-grid">{doctors.slice(0, 3).map((doctor) => <DoctorCard doctor={doctor} key={doctor.id} onBook={openBooking} />)}</div>
+              <div className="doctor-grid">{doctors.slice(0, 3).map((doctor) => <DoctorCard doctor={doctor} nextAvailable={availabilityByDoctor[doctor.id][0]} key={doctor.id} onBook={openBooking} />)}</div>
             </section>
 
             <section className="section-block upcoming-section">
@@ -293,7 +317,7 @@ function App() {
           <div className="page-content">
             <section className="welcome-row directory-heading"><div><p className="eyebrow">Fictional profiles · not verified providers</p><h1>Meet the team</h1><p className="page-subtitle">These names and availability are fictional and are not verified medical providers. Listed times are illustrative only. Mentalism is entertainment, not medical care.</p></div><div className="directory-count"><strong>{filteredDoctors.length}</strong><span>profiles</span></div></section>
             <div className="filter-row"><div className="filter-pills" aria-label="Filter by department"><button className={specialty === 'All specialties' ? 'selected' : ''} onClick={() => setSpecialty('All specialties')}>All profiles</button>{specialties.map((item) => <button key={item.name} className={specialty === item.name ? 'selected' : ''} onClick={() => setSpecialty(item.name)}>{item.name}</button>)}</div></div>
-            {filteredDoctors.length ? <div className="doctor-grid directory-grid">{filteredDoctors.map((doctor) => <DoctorCard doctor={doctor} key={doctor.id} onBook={openBooking} />)}</div> : <div className="empty-state"><span className="empty-calendar"><Icon name="search" size={23} /></span><h2>No doctors found</h2><p>Try another name or choose a different specialty.</p><button className="outline-button" onClick={() => { setSearch(''); setSpecialty('All specialties'); }}>Clear filters</button></div>}
+            {filteredDoctors.length ? <div className="doctor-grid directory-grid">{filteredDoctors.map((doctor) => <DoctorCard doctor={doctor} nextAvailable={availabilityByDoctor[doctor.id][0]} key={doctor.id} onBook={openBooking} />)}</div> : <div className="empty-state"><span className="empty-calendar"><Icon name="search" size={23} /></span><h2>No doctors found</h2><p>Try another name or choose a different specialty.</p><button className="outline-button" onClick={() => { setSearch(''); setSpecialty('All specialties'); }}>Clear filters</button></div>}
             <footer className="page-footer">MediConnect · A little more care, a little more connected.</footer>
           </div>
         )}
@@ -307,7 +331,7 @@ function App() {
           </div>
         )}
 
-        {(section === 'reports' || section === 'admissions') && !user.previewAccess && (
+        {(section === 'reports' || section === 'admissions' || (section === 'staff' && user.role === 'ADMIN')) && (
           <PatientCare token={user.accessToken} role={user.role} section={section} />
         )}
       </main>
@@ -315,11 +339,11 @@ function App() {
       {bookingDoctor && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setBookingDoctor(null); }}>
         <section className="booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
           <div className="modal-top"><span className="modal-kicker">SCHEDULE PLANNER</span><button className="icon-button modal-close" onClick={() => setBookingDoctor(null)} aria-label="Close booking"><Icon name="close" /></button></div>
-          <h2 id="booking-title">Choose a time.</h2><p className="modal-intro">Add a time to your personal planner.</p>
+          <h2 id="booking-title">Choose a time.</h2><p className="modal-intro">Select an illustrative time for your personal planner.</p>
           <div className="booking-doctor"><DoctorAvatar doctor={bookingDoctor} /><div><strong>{bookingDoctor.name}</strong><span>{bookingDoctor.specialty} · {bookingDoctor.credentials}</span></div><span className="availability-dot" title="Illustrative time" /></div>
           <form className="booking-form" onSubmit={confirmBooking}>
             <label>Appointment date<input type="date" value={bookingDate} onChange={(event) => setBookingDate(event.target.value)} min={new Date().toLocaleDateString('en-CA')} required /></label>
-            <label>Available time<select value={bookingTime} onChange={(event) => setBookingTime(event.target.value)} required><option value="">Choose a time</option><option>9:00 AM</option><option>10:30 AM</option><option>11:15 AM</option><option>1:00 PM</option><option>2:30 PM</option><option>3:45 PM</option></select></label>
+            <label>Available time<select value={bookingTime} onChange={(event) => setBookingTime(event.target.value)} required><option value="">Choose a time</option>{availableTimes.map((time) => <option key={time}>{time}</option>)}</select></label>
             <p className="booking-disclaimer">{bookingDoctor.specialty === 'Mentalist' ? 'Vinay is an entertainment profile, not a medical or mental-health provider. The listed time is illustrative; saving it does not create an appointment.' : 'This profile is fictional and unverified. Saving a time does not contact a clinic or create a real appointment; your entry stays in this browser session.'}</p>
             <button className="primary-button modal-submit" type="submit"><Icon name="calendar" size={17} /> Save to planner</button>
           </form>
@@ -329,14 +353,14 @@ function App() {
   );
 }
 
-function DoctorCard({ doctor, onBook }) {
+function DoctorCard({ doctor, nextAvailable, onBook }) {
   return (
     <article className="doctor-card">
       <div className="doctor-card-top"><DoctorAvatar doctor={doctor} large /><span className="availability-pill"><i /> Illustrative time</span></div>
       <h3>{doctor.name}</h3><p className="doctor-specialty">{doctor.specialty} <span>·</span> {doctor.credentials}</p>
       <p className="doctor-tagline">{doctor.tagline}</p>
-      <div className="doctor-next"><span><Icon name="clock" size={15} /> Next available</span><strong>{doctor.next}</strong></div>
-      <button className="doctor-book-button" onClick={() => onBook(doctor)}>Book appointment <Icon name="arrow" size={16} /></button>
+      <div className="doctor-next"><span><Icon name="clock" size={15} /> Next available</span><strong>Today, {nextAvailable}</strong></div>
+      <button className="doctor-book-button" onClick={() => onBook(doctor)}>Choose appointment time <Icon name="arrow" size={16} /></button>
     </article>
   );
 }

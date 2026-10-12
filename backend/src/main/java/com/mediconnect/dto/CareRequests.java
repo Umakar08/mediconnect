@@ -1,6 +1,7 @@
 package com.mediconnect.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
@@ -17,7 +18,8 @@ public final class CareRequests {
             @Size(max = 1000) String notes) { }
 
     public record Admission(
-            @NotBlank @Size(max = 100) String requestedWard,
+            @NotBlank @Pattern(regexp = "Single|Sharing|General|Deluxe") String roomType,
+            @NotBlank @Size(max = 100) String doctorName,
             @Size(max = 1000) String reason) { }
 
     public record Bed(

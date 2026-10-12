@@ -23,6 +23,6 @@ public final class CareResponses {
 
     public record Admission(
             Long id, Long patientId, String patientName, String patientEmail,
-            String requestedWard, String reason, AdmissionStatus status, Instant requestedAt,
+            String requestedWard, String doctorName, String reason, AdmissionStatus status, Instant requestedAt,
             Instant reviewedAt, String reviewedBy, Bed bed) { }
 }

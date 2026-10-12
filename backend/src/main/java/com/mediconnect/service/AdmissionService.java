@@ -40,13 +40,13 @@ public class AdmissionService {
         User lockedPatient = userRepository.findByIdForUpdate(patient.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Patient not found"));
         boolean alreadyActive = admissionRequestRepository.existsByPatientIdAndStatusIn(lockedPatient.getId(),
-                List.of(AdmissionStatus.PENDING, AdmissionStatus.ADMITTED));
+                List.of(AdmissionStatus.PENDING, AdmissionStatus.WAITLISTED, AdmissionStatus.ADMITTED));
         if (alreadyActive) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "You already have a pending request or active admission");
         }
         AdmissionRequest saved = admissionRequestRepository.save(new AdmissionRequest(
-                lockedPatient, admission.requestedWard().trim(), clean(admission.reason())));
+                lockedPatient, admission.roomType(), admission.doctorName().trim(), clean(admission.reason())));
         return toAdmission(saved);
     }
 
@@ -64,6 +64,17 @@ public class AdmissionService {
         return beds.stream().map(this::toBed).toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<CareResponses.Bed> availableBeds() {
+        return beds(true);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CareResponses.Bed> availableBedsForRoomType(String roomType) {
+        return hospitalBedRepository.findByBedTypeIgnoreCaseAndStatusOrderByBedCodeAsc(roomType, BedStatus.AVAILABLE)
+                .stream().map(this::toBed).toList();
+    }
+
     @Transactional
     public CareResponses.Bed createBed(CareRequests.Bed request) {
         String bedCode = request.bedCode().trim();
@@ -79,13 +90,18 @@ public class AdmissionService {
     public CareResponses.Admission assignBed(Long requestId, CareRequests.BedAssignment assignment, User staff) {
         AdmissionRequest request = admissionRequestRepository.findByIdForUpdate(requestId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission request not found"));
-        if (request.getStatus() != AdmissionStatus.PENDING) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending requests can be assigned a bed");
+        if (request.getStatus() != AdmissionStatus.PENDING && request.getStatus() != AdmissionStatus.WAITLISTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Only pending or waitlisted requests can be assigned a bed");
         }
         HospitalBed bed = hospitalBedRepository.findByIdForUpdate(assignment.bedId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Bed not found"));
         if (bed.getStatus() != BedStatus.AVAILABLE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "That bed is no longer available");
+        }
+        if (!bed.getBedType().equalsIgnoreCase(request.getRequestedWard())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "The selected room does not match the patient's requested room type");
         }
         bed.setStatus(BedStatus.OCCUPIED);
         request.assign(bed, staff);
@@ -93,11 +109,23 @@ public class AdmissionService {
     }
 
     @Transactional
-    public CareResponses.Admission reject(Long requestId, User staff) {
+    public CareResponses.Admission waitlist(Long requestId, User staff) {
         AdmissionRequest request = admissionRequestRepository.findByIdForUpdate(requestId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission request not found"));
         if (request.getStatus() != AdmissionStatus.PENDING) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending requests can be rejected");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending requests can be waitlisted");
+        }
+        request.waitlist(staff);
+        return toAdmission(request);
+    }
+
+    @Transactional
+    public CareResponses.Admission reject(Long requestId, User staff) {
+        AdmissionRequest request = admissionRequestRepository.findByIdForUpdate(requestId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admission request not found"));
+        if (request.getStatus() != AdmissionStatus.PENDING && request.getStatus() != AdmissionStatus.WAITLISTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Only pending or waitlisted requests can be rejected");
         }
         request.reject(staff);
         return toAdmission(request);
@@ -120,7 +148,7 @@ public class AdmissionService {
     private CareResponses.Admission toAdmission(AdmissionRequest request) {
         return new CareResponses.Admission(request.getId(), request.getPatient().getId(),
                 request.getPatient().getName(), request.getPatient().getEmail(), request.getRequestedWard(),
-                request.getReason(), request.getStatus(), request.getRequestedAt(), request.getReviewedAt(),
+                request.getDoctorName(), request.getReason(), request.getStatus(), request.getRequestedAt(), request.getReviewedAt(),
                 request.getReviewedBy() == null ? null : request.getReviewedBy().getName(),
                 request.getBed() == null ? null : toBed(request.getBed()));
     }

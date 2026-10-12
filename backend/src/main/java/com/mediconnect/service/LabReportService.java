@@ -5,6 +5,7 @@ import com.mediconnect.dto.CareResponses;
 import com.mediconnect.entity.LabReportFile;
 import com.mediconnect.entity.LabResult;
 import com.mediconnect.entity.User;
+import com.mediconnect.entity.UserRole;
 import com.mediconnect.repository.LabReportFileRepository;
 import com.mediconnect.repository.LabResultRepository;
 import com.mediconnect.repository.UserRepository;
@@ -69,7 +70,10 @@ public class LabReportService {
 
     @Transactional(readOnly = true)
     public List<CareResponses.LabReportFile> patientFiles(User patient) {
-        return filesFor(patient.getId());
+        return labReportFileRepository.findByPatientIdOrderByUploadedAtDesc(patient.getId()).stream()
+                .filter(report -> report.getUploadedBy().getRole() == UserRole.STAFF
+                        || report.getUploadedBy().getRole() == UserRole.ADMIN)
+                .map(this::toLabReportFile).toList();
     }
 
     @Transactional(readOnly = true)
@@ -79,7 +83,11 @@ public class LabReportService {
     }
 
     @Transactional
-    public CareResponses.LabReportFile upload(User patient, MultipartFile file) {
+    public CareResponses.LabReportFile uploadForPatient(Long patientId, User staff, MultipartFile file) {
+        return upload(patient(patientId), staff, file);
+    }
+
+    private CareResponses.LabReportFile upload(User patient, User uploadedBy, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose a report file to upload");
         }
@@ -110,7 +118,7 @@ public class LabReportService {
 
         String filename = safeFilename(file.getOriginalFilename());
         LabReportFile saved = labReportFileRepository.save(new LabReportFile(
-                patient, patient, filename, storageKey, fileType.contentType, contents.length));
+                patient, uploadedBy, filename, storageKey, fileType.contentType, contents.length));
         return toLabReportFile(saved);
     }
 
@@ -118,6 +126,10 @@ public class LabReportService {
     public DownloadableReport patientDownload(User patient, Long reportId) {
         LabReportFile report = labReportFileRepository.findByIdAndPatientId(reportId, patient.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Report not found"));
+        if (report.getUploadedBy().getRole() != UserRole.STAFF
+                && report.getUploadedBy().getRole() != UserRole.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Report not found");
+        }
         return downloadable(report);
     }
 

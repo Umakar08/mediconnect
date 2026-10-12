@@ -7,7 +7,6 @@ import com.mediconnect.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,11 +17,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = {
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "https://frontend-three-rho-24.vercel.app"
-})
 public class AuthController {
     private final AuthService authService;
 
@@ -37,6 +31,11 @@ public class AuthController {
     @PostMapping("/login")
     public AuthResponse login(@Valid @RequestBody AuthRequests.Login request) {
         return authService.login(request);
+    }
+
+    @PostMapping("/staff/login")
+    public AuthResponse staffLogin(@Valid @RequestBody AuthRequests.Login request) {
+        return authService.staffLogin(request);
     }
 
     @GetMapping("/me")

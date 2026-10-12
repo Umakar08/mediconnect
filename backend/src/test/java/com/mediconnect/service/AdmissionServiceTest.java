@@ -38,7 +38,7 @@ class AdmissionServiceTest {
     @Test
     void assigningAvailableBedAdmitsPatientAndOccupiesBed() {
         User patient = patient();
-        AdmissionRequest request = new AdmissionRequest(patient, "Medical ward", null);
+        AdmissionRequest request = new AdmissionRequest(patient, "Standard", null);
         HospitalBed bed = bed(BedStatus.AVAILABLE);
         when(admissionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(request));
         when(bedRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(bed));
@@ -51,7 +51,7 @@ class AdmissionServiceTest {
 
     @Test
     void assigningOccupiedBedDoesNotAdmitPatient() {
-        AdmissionRequest request = new AdmissionRequest(patient(), "Medical ward", null);
+        AdmissionRequest request = new AdmissionRequest(patient(), "Standard", null);
         HospitalBed bed = bed(BedStatus.OCCUPIED);
         when(admissionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(request));
         when(bedRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(bed));
@@ -91,10 +91,67 @@ class AdmissionServiceTest {
         User patient = patient();
         when(userRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(patient));
         when(admissionRepository.existsByPatientIdAndStatusIn(
-                7L, java.util.List.of(AdmissionStatus.PENDING, AdmissionStatus.ADMITTED))).thenReturn(true);
+                7L, java.util.List.of(AdmissionStatus.PENDING, AdmissionStatus.WAITLISTED,
+                        AdmissionStatus.ADMITTED))).thenReturn(true);
 
         assertThrows(ResponseStatusException.class, () -> service.requestAdmission(
-                patient, new CareRequests.Admission("Medical ward", "Request")));
+                patient, new CareRequests.Admission("Single", "Rohith", "Request")));
+    }
+
+    @Test
+    void admissionRequestKeepsSelectedRoomAndDoctor() {
+        User patient = patient();
+        when(userRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(patient));
+        when(admissionRepository.save(org.mockito.ArgumentMatchers.any(AdmissionRequest.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        CareResponses.Admission result = service.requestAdmission(
+                patient, new CareRequests.Admission("Deluxe", "Umakar", "Request"));
+
+        assertEquals("Deluxe", result.requestedWard());
+        assertEquals("Umakar", result.doctorName());
+    }
+
+    @Test
+    void staffCanPlacePendingRequestOnWaitlist() {
+        AdmissionRequest request = new AdmissionRequest(patient(), "Single", "Rohith", null);
+        User staff = mock(User.class);
+        when(staff.getName()).thenReturn("Sam Staff");
+        when(admissionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(request));
+
+        CareResponses.Admission result = service.waitlist(1L, staff);
+
+        assertEquals(AdmissionStatus.WAITLISTED, result.status());
+        assertEquals("Sam Staff", result.reviewedBy());
+        org.junit.jupiter.api.Assertions.assertNotNull(result.reviewedAt());
+    }
+
+    @Test
+    void waitlistedRequestCanBeAcceptedWhenBedBecomesAvailable() {
+        AdmissionRequest request = new AdmissionRequest(patient(), "Standard", "Rohith", null);
+        request.waitlist(mock(User.class));
+        HospitalBed bed = bed(BedStatus.AVAILABLE);
+        when(admissionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(request));
+        when(bedRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(bed));
+
+        CareResponses.Admission result = service.assignBed(1L, new CareRequests.BedAssignment(2L), mock(User.class));
+
+        assertEquals(AdmissionStatus.ADMITTED, result.status());
+        verify(bed).setStatus(BedStatus.OCCUPIED);
+    }
+
+    @Test
+    void assigningRoomOfDifferentTypeIsRejected() {
+        AdmissionRequest request = new AdmissionRequest(patient(), "Deluxe", "Rohith", null);
+        HospitalBed bed = bed(BedStatus.AVAILABLE);
+        when(admissionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(request));
+        when(bedRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(bed));
+
+        assertThrows(ResponseStatusException.class,
+                () -> service.assignBed(1L, new CareRequests.BedAssignment(2L), mock(User.class)));
+
+        assertEquals(AdmissionStatus.PENDING, request.getStatus());
+        verify(bed, org.mockito.Mockito.never()).setStatus(BedStatus.OCCUPIED);
     }
 
     private User patient() {

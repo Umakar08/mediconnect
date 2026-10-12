@@ -16,19 +16,18 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/staff")
-@CrossOrigin(origins = { "http://localhost:5173", "http://localhost:5174",
-        "https://frontend-three-rho-24.vercel.app" })
 public class StaffCareController {
     private final UserRepository userRepository;
     private final LabReportService labReportService;
@@ -69,6 +68,13 @@ public class StaffCareController {
         return labReportService.filesFor(patientId);
     }
 
+    @PostMapping(value = "/patients/{patientId}/lab-reports", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public CareResponses.LabReportFile uploadLabReport(
+            @PathVariable Long patientId, @AuthenticationPrincipal User staff,
+            @RequestPart("file") MultipartFile file) {
+        return labReportService.uploadForPatient(patientId, staff, file);
+    }
+
     @GetMapping("/lab-reports/{reportId}/download")
     public ResponseEntity<Resource> download(@PathVariable Long reportId) {
         var report = labReportService.staffDownload(reportId);
@@ -82,6 +88,16 @@ public class StaffCareController {
     @GetMapping("/admissions")
     public List<CareResponses.Admission> admissions() {
         return admissionService.staffAdmissions();
+    }
+
+    @GetMapping("/admissions/available-beds")
+    public List<CareResponses.Bed> availableAdmissionBeds() {
+        return admissionService.availableBeds();
+    }
+
+    @GetMapping("/admissions/available-beds/{roomType}")
+    public List<CareResponses.Bed> availableAdmissionBedsForRoomType(@PathVariable String roomType) {
+        return admissionService.availableBedsForRoomType(roomType);
     }
 
     @GetMapping("/beds")
@@ -103,6 +119,11 @@ public class StaffCareController {
     @PostMapping("/admissions/{requestId}/reject")
     public CareResponses.Admission reject(@PathVariable Long requestId, @AuthenticationPrincipal User staff) {
         return admissionService.reject(requestId, staff);
+    }
+
+    @PostMapping("/admissions/{requestId}/waitlist")
+    public CareResponses.Admission waitlist(@PathVariable Long requestId, @AuthenticationPrincipal User staff) {
+        return admissionService.waitlist(requestId, staff);
     }
 
     @PostMapping("/admissions/{requestId}/discharge")

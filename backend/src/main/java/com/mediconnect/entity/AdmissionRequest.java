@@ -39,6 +39,9 @@ public class AdmissionRequest {
     @Column(name = "requested_ward", nullable = false, length = 100)
     private String requestedWard;
 
+    @Column(name = "doctor_name", length = 100)
+    private String doctorName;
+
     @Column(length = 1000)
     private String reason;
 
@@ -51,8 +54,13 @@ public class AdmissionRequest {
     protected AdmissionRequest() { }
 
     public AdmissionRequest(User patient, String requestedWard, String reason) {
+        this(patient, requestedWard, null, reason);
+    }
+
+    public AdmissionRequest(User patient, String requestedWard, String doctorName, String reason) {
         this.patient = patient;
         this.requestedWard = requestedWard;
+        this.doctorName = doctorName;
         this.reason = reason;
     }
 
@@ -62,6 +70,7 @@ public class AdmissionRequest {
     public User getReviewedBy() { return reviewedBy; }
     public AdmissionStatus getStatus() { return status; }
     public String getRequestedWard() { return requestedWard; }
+    public String getDoctorName() { return doctorName; }
     public String getReason() { return reason; }
     public Instant getRequestedAt() { return requestedAt; }
     public Instant getReviewedAt() { return reviewedAt; }
@@ -76,6 +85,12 @@ public class AdmissionRequest {
     public void reject(User staff) {
         this.reviewedBy = staff;
         this.status = AdmissionStatus.REJECTED;
+        this.reviewedAt = Instant.now();
+    }
+
+    public void waitlist(User staff) {
+        this.reviewedBy = staff;
+        this.status = AdmissionStatus.WAITLISTED;
         this.reviewedAt = Instant.now();
     }
 

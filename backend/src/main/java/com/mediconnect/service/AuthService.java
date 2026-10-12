@@ -4,6 +4,7 @@ import com.mediconnect.dto.AuthRequests;
 import com.mediconnect.dto.AuthResponse;
 import com.mediconnect.entity.AccessToken;
 import com.mediconnect.entity.User;
+import com.mediconnect.entity.UserRole;
 import com.mediconnect.repository.AccessTokenRepository;
 import com.mediconnect.repository.UserRepository;
 import com.mediconnect.security.TokenHash;
@@ -15,6 +16,7 @@ import java.util.Locale;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -40,10 +42,22 @@ public class AuthService {
         return new AuthResponse(user.getId(), user.getName(), user.getEmail(), user.getRole(), null, "Account created");
     }
 
+    @Transactional
     public AuthResponse login(AuthRequests.Login request) {
+        return authenticate(request, false);
+    }
+
+    @Transactional
+    public AuthResponse staffLogin(AuthRequests.Login request) {
+        return authenticate(request, true);
+    }
+
+    private AuthResponse authenticate(AuthRequests.Login request, boolean staffLogin) {
         User user = userRepository.findByEmailIgnoreCase(normalizeEmail(request.email()))
                 .orElseThrow(this::invalidCredentials);
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        boolean staffOrAdmin = user.getRole() == UserRole.STAFF || user.getRole() == UserRole.ADMIN;
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())
+                || (staffLogin ? !staffOrAdmin : staffOrAdmin)) {
             throw invalidCredentials();
         }
         accessTokenRepository.deleteByExpiresAtBefore(Instant.now());
@@ -54,6 +68,7 @@ public class AuthService {
         return new AuthResponse(user.getId(), user.getName(), user.getEmail(), user.getRole(), rawToken, "Signed in successfully");
     }
 
+    @Transactional
     public void logout(String rawToken) {
         if (rawToken != null && !rawToken.isBlank()) {
             accessTokenRepository.deleteByTokenHash(TokenHash.sha256(rawToken));

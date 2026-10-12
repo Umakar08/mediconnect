@@ -39,11 +39,20 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/register", "/api/auth/login", "/api/health", "/error").permitAll()
+                        .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/staff/login",
+                                "/api/health", "/error").permitAll()
                         .requestMatchers("/api/auth/me", "/api/auth/logout")
                         .hasAnyRole("PATIENT", "STAFF", "ADMIN")
                         .requestMatchers("/api/patient/**").hasRole("PATIENT")
-                        .requestMatchers("/api/staff/**").hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers("/api/staff/admissions",
+                                "/api/staff/admissions/available-beds",
+                                "/api/staff/admissions/available-beds/*",
+                                "/api/staff/admissions/*/assign",
+                                "/api/staff/admissions/*/waitlist")
+                        .hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers("/api/staff/patients/**", "/api/staff/lab-reports/**")
+                        .hasAnyRole("STAFF", "ADMIN")
+                        .requestMatchers("/api/staff/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/secure/**").authenticated()
                         .anyRequest().permitAll())

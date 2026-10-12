@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 import './patient-care.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+const admissionRoomTypes = ['Single', 'Sharing', 'General', 'Deluxe'];
+const admissionDoctors = [
+  { name: 'Rohith', specialty: 'Orthopedics' },
+  { name: 'Umakar', specialty: 'Cardiology' },
+  { name: 'Mrudhvan', specialty: 'Dermatology' },
+  { name: 'Vishnu', specialty: 'Neurology' },
+];
 
 async function apiRequest(token, path, options = {}) {
   const headers = new Headers(options.headers || {});
@@ -80,7 +87,7 @@ function PatientCare({ token, role, section }) {
       if (isStaff) {
         const [admissionRows, bedRows] = await Promise.all([
           apiRequest(token, '/staff/admissions'),
-          apiRequest(token, '/staff/beds'),
+          apiRequest(token, role === 'ADMIN' ? '/staff/beds' : '/staff/admissions/available-beds'),
         ]);
         setAdmissions(admissionRows);
         setBeds(bedRows);
@@ -104,15 +111,15 @@ function PatientCare({ token, role, section }) {
     event.preventDefault();
     const form = event.currentTarget;
     const file = form.elements.report.files[0];
-    if (!file) return;
+    if (!file || !selectedPatientId) return;
     const formData = new FormData();
     formData.append('file', file);
     setError('');
     setNotice('');
     try {
-      await apiRequest(token, '/patient/lab-reports', { method: 'POST', body: formData });
+      await apiRequest(token, `/staff/patients/${selectedPatientId}/lab-reports`, { method: 'POST', body: formData });
       form.reset();
-      setNotice('Your report has been uploaded to your patient record.');
+      setNotice('The report has been uploaded to the selected patient record.');
       await loadReports();
     } catch (requestError) {
       setError(requestError.message);
@@ -214,7 +221,7 @@ function PatientCare({ token, role, section }) {
         headers: body ? { 'Content-Type': 'application/json' } : {},
         body: body ? JSON.stringify(body) : undefined,
       });
-      setNotice(action === 'assign' ? 'Bed assigned and marked occupied.' : action === 'reject' ? 'Admission request declined.' : 'Admission marked discharged; bed released.');
+      setNotice(action === 'assign' ? 'Admission accepted and bed assigned.' : action === 'waitlist' ? 'Patient added to the admission waitlist.' : action === 'reject' ? 'Admission request declined.' : 'Admission marked discharged; bed released.');
       await loadAdmissions();
     } catch (requestError) {
       setError(requestError.message);
@@ -240,9 +247,27 @@ function PatientCare({ token, role, section }) {
     }
   }
 
+  if (section === 'staff' && role === 'ADMIN') {
+    return <div className="page-content care-page">
+      <CarePageHeading eyebrow="Administrator workspace" title="Create staff account" description="Add a staff member who can access patient reports and enter test results." />
+      <Feedback error={error} notice={notice} />
+      <section className="care-panel">
+        <form className="care-form" onSubmit={createStaff}>
+          <div className="care-form-grid">
+            <label className="care-label">Full name<input name="name" maxLength="100" autoComplete="name" required /></label>
+            <label className="care-label">Email<input name="email" type="email" maxLength="255" autoComplete="email" required /></label>
+            <label className="care-label care-field-wide">Temporary password<input name="password" type="password" minLength="12" maxLength="72" autoComplete="new-password" required /></label>
+          </div>
+          <button className="primary-button" type="submit">Create staff account</button>
+        </form>
+      </section>
+      <p className="care-disclaimer">Staff accounts can access patient reports and results; bed management and staff administration remain restricted to the main staff administrator.</p>
+    </div>;
+  }
+
   if (section === 'reports') {
     return <div className="page-content care-page">
-      <CarePageHeading eyebrow={isStaff ? 'Clinical workspace' : 'Your health records'} title={isStaff ? 'Blood test reports' : 'My blood test reports'} description={isStaff ? 'Review patient-submitted files and add verified results to the patient record.' : 'View results entered by your care team and upload a copy of a report.'} />
+      <CarePageHeading eyebrow={isStaff ? 'Clinical workspace' : 'Your health records'} title={isStaff ? 'Blood test reports' : 'My blood test reports'} description={isStaff ? 'Choose a patient, add test results, and upload report files to their record.' : 'View test results and report files uploaded by your care team.'} />
       <Feedback error={error} notice={notice} />
       {isStaff && <section className="care-panel">
         <h2>Patient record</h2>
@@ -265,21 +290,12 @@ function PatientCare({ token, role, section }) {
           </div>
           <button className="primary-button" type="submit" disabled={!selectedPatientId}>Save test result</button>
         </form>
-        {role === 'ADMIN' && <form className="care-form staff-entry" onSubmit={createStaff}>
-          <h3>Create staff account</h3>
-          <div className="care-form-grid">
-            <label className="care-label">Full name<input name="name" maxLength="100" required /></label>
-            <label className="care-label">Email<input name="email" type="email" maxLength="255" required /></label>
-            <label className="care-label care-field-wide">Temporary password<input name="password" type="password" minLength="12" maxLength="72" autoComplete="new-password" required /></label>
-          </div>
-          <button className="outline-button" type="submit">Create staff account</button>
-        </form>}
+        <form className="care-panel care-upload" onSubmit={handleUpload}>
+          <div><h2>Upload a report</h2><p>PDF, PNG, or JPEG · up to 10 MB. The file will be added to the selected patient's record.</p></div>
+          <label className="care-label">Report file<input name="report" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" required disabled={!selectedPatientId} /></label>
+          <button className="primary-button" type="submit" disabled={!selectedPatientId}>Upload report</button>
+        </form>
       </section>}
-      {!isStaff && <form className="care-panel care-upload" onSubmit={handleUpload}>
-        <div><h2>Upload a report</h2><p>PDF, PNG, or JPEG · up to 10 MB. Only you and authorized care staff can access it.</p></div>
-        <label className="care-label">Report file<input name="report" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" required /></label>
-        <button className="primary-button" type="submit">Upload report</button>
-      </form>}
       {loading ? <div className="care-panel care-muted">Loading patient records…</div> : <>
         <section className="care-panel">
           <div className="care-panel-heading"><div><p className="eyebrow">Structured values</p><h2>Test results</h2></div><span>{results.length}</span></div>
@@ -296,11 +312,19 @@ function PatientCare({ token, role, section }) {
 
   if (section === 'admissions') {
     const availableBeds = beds.filter((bed) => bed.status === 'AVAILABLE');
+    const inventorySummary = admissionRoomTypes.map((roomType) => {
+      const roomBeds = beds.filter((bed) => bed.bedType.toLowerCase() === roomType.toLowerCase());
+      const availableCount = roomBeds.filter((bed) => bed.status === 'AVAILABLE').length;
+      const totalPlaces = roomType === 'Sharing' ? 60 : roomType === 'General' ? 50 : 30;
+      const unit = roomType === 'Sharing' || roomType === 'General' ? 'beds' : 'rooms';
+      return `${roomType}: ${availableCount}/${totalPlaces} ${unit} available`;
+    });
     return <div className="page-content care-page">
-      <CarePageHeading eyebrow={isStaff ? 'Clinical workspace' : 'Hospital care'} title={isStaff ? 'Admissions & beds' : 'Admission requests'} description={isStaff ? 'Review requests, manage the bed inventory, and track current admissions.' : 'Request an admission for review by the hospital care team.'} />
+      <CarePageHeading eyebrow={isStaff ? 'Clinical workspace' : 'Hospital care'} title={isStaff ? (role === 'ADMIN' ? 'Admissions & beds' : 'Admission requests') : 'Admission requests'} description={isStaff ? (role === 'ADMIN' ? 'Review requests, manage the bed inventory, and track current admissions.' : 'Review admission requests, accept patients into an available bed, or add them to the waitlist.') : 'Request an admission for review by the hospital care team.'} />
       <Feedback error={error} notice={notice} />
-      {isStaff && <section className="care-panel">
+      {role === 'ADMIN' && <section className="care-panel">
         <div className="care-panel-heading"><div><p className="eyebrow">Bed inventory</p><h2>Available beds</h2></div><span>{availableBeds.length} available / {beds.length} total</span></div>
+        <div className="care-inventory-summary">{inventorySummary.map((item) => <span key={item}>{item}</span>)}</div>
         <form className="care-form bed-entry" onSubmit={addBed}>
           <h3>Add a bed to the inventory</h3>
           <div className="care-form-grid">
@@ -316,24 +340,29 @@ function PatientCare({ token, role, section }) {
         <h2>Request an admission</h2>
         <p className="care-muted">Submitting a request does not confirm an admission or reserve a bed. The care team will review it.</p>
         <div className="care-form-grid">
-          <label className="care-label">Preferred ward<input name="requestedWard" maxLength="100" placeholder="e.g. Medical ward" required /></label>
+          <label className="care-label">Room type<select name="roomType" defaultValue="" required><option value="">Select a room type</option>{admissionRoomTypes.map((roomType) => <option key={roomType} value={roomType}>{roomType}</option>)}</select></label>
+          <label className="care-label">Doctor<select name="doctorName" defaultValue="" required><option value="">Select your doctor</option>{admissionDoctors.map((doctor) => <option key={doctor.name} value={doctor.name}>{doctor.name} · {doctor.specialty}</option>)}</select></label>
           <label className="care-label care-field-wide">Reason for request<textarea name="reason" maxLength="1000" rows="3" placeholder="Share brief information for the admissions team" /></label>
         </div>
+        <p className="care-muted">Doctor names match the illustrative care directory and are not verified providers.</p>
         <button className="primary-button" type="submit">Send admission request</button>
       </form>}
       {loading ? <div className="care-panel care-muted">Loading admissions…</div> : <section className="care-panel">
         <div className="care-panel-heading"><div><p className="eyebrow">{isStaff ? 'Request queue' : 'Your requests'}</p><h2>{isStaff ? 'Admission requests' : 'Admission history'}</h2></div><span>{admissions.length}</span></div>
         {admissions.length ? <div className="care-admission-list">{admissions.map((admission) => <article className="care-admission" key={admission.id}>
-          <div className="care-admission-top"><div><strong>{isStaff ? admission.patientName : `Request for ${admission.requestedWard}`}</strong><small>{isStaff ? admission.patientEmail : `Preferred ward: ${admission.requestedWard}`} · {new Date(admission.requestedAt).toLocaleDateString()}</small></div><span className={`care-status ${admission.status.toLowerCase()}`}>{admission.status}</span></div>
+          <div className="care-admission-top"><div><strong>{isStaff ? admission.patientName : `Request for ${admission.requestedWard}`}</strong><small>{isStaff ? `${admission.patientEmail} · Room type: ${admission.requestedWard}` : `Room type: ${admission.requestedWard}`} · {new Date(admission.requestedAt).toLocaleDateString()}</small></div><span className={`care-status ${admission.status.toLowerCase()}`}>{admission.status === 'WAITLISTED' ? 'WAITLIST' : admission.status}</span></div>
+          {admission.doctorName && <p>Doctor: {admission.doctorName}</p>}
           {admission.reason && <p>{admission.reason}</p>}
           {admission.bed && <p className="care-assigned-bed">Assigned: {admission.bed.bedCode} · {admission.bed.ward} · {admission.bed.bedType}</p>}
+          {!isStaff && admission.status === 'WAITLISTED' && <p className="care-muted">Your request is on the waitlist. The care team will contact you when a room becomes available.</p>}
           {isStaff && admission.reviewedBy && <p className="care-muted">Last action by {admission.reviewedBy}{admission.reviewedAt ? ` · ${new Date(admission.reviewedAt).toLocaleString()}` : ''}</p>}
-          {isStaff && admission.status === 'PENDING' && <div className="care-actions">
-            <label className="care-label">Available bed<select value={bedSelections[admission.id] || ''} onChange={(event) => setBedSelections((current) => ({ ...current, [admission.id]: event.target.value }))}><option value="">Select a bed</option>{availableBeds.map((bed) => <option key={bed.id} value={bed.id}>{bed.bedCode} · {bed.ward} · {bed.bedType}</option>)}</select></label>
-            <button className="primary-button" type="button" disabled={!bedSelections[admission.id]} onClick={() => updateAdmission(admission.id, 'assign', { bedId: Number(bedSelections[admission.id]) })}>Approve & assign bed</button>
-            <button className="outline-button" type="button" onClick={() => updateAdmission(admission.id, 'reject')}>Decline</button>
+          {isStaff && (admission.status === 'PENDING' || admission.status === 'WAITLISTED') && <div className="care-actions">
+            <label className="care-label">Available room / bed<select value={bedSelections[admission.id] || ''} onChange={(event) => setBedSelections((current) => ({ ...current, [admission.id]: event.target.value }))}><option value="">Select a {admission.requestedWard.toLowerCase()} room / bed</option>{availableBeds.filter((bed) => bed.bedType.toLowerCase() === admission.requestedWard.toLowerCase()).map((bed) => <option key={bed.id} value={bed.id}>{bed.bedCode}</option>)}</select></label>
+            <button className="primary-button" type="button" disabled={!bedSelections[admission.id]} onClick={() => updateAdmission(admission.id, 'assign', { bedId: Number(bedSelections[admission.id]) })}>Accept & assign bed</button>
+            {role === 'STAFF' && admission.status === 'PENDING' && <button className="outline-button" type="button" onClick={() => updateAdmission(admission.id, 'waitlist')}>Add to waitlist</button>}
+            {role === 'ADMIN' && (admission.status === 'PENDING' || admission.status === 'WAITLISTED') && <button className="outline-button" type="button" onClick={() => updateAdmission(admission.id, 'reject')}>Decline</button>}
           </div>}
-          {isStaff && admission.status === 'ADMITTED' && <button className="outline-button care-discharge" type="button" onClick={() => updateAdmission(admission.id, 'discharge')}>Discharge & release bed</button>}
+          {role === 'ADMIN' && admission.status === 'ADMITTED' && <button className="outline-button care-discharge" type="button" onClick={() => updateAdmission(admission.id, 'discharge')}>Discharge & release bed</button>}
         </article>)}</div> : <p className="care-muted">No admission requests{isStaff ? ' have been received' : ' yet'}.</p>}
       </section>}
       <p className="care-disclaimer">A request is not a clinical assessment or a confirmed admission. Contact emergency services for urgent medical emergencies.</p>

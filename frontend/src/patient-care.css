@@ -43,6 +43,8 @@
 .care-bed strong { color: #41565b; }
 .care-bed small { margin-left: 5px; color: #488367; font-size: 8px; font-weight: 700; }
 .care-bed.occupied small { color: #bb7950; }
+.care-inventory-summary { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 15px; }
+.care-inventory-summary span { padding: 7px 9px; border: 1px solid #e7eeeb; border-radius: 6px; background: #fafcfb; color: #657579; font-size: 9px; }
 .care-admission { padding: 13px; border: 1px solid #edf1ef; border-radius: 8px; }
 .care-admission-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .care-admission-top > div { display: grid; gap: 5px; }
@@ -52,6 +54,7 @@
 .care-admission > p.care-assigned-bed { color: #247869; font-weight: 600; }
 .care-status { flex: 0 0 auto; padding: 5px 8px; border-radius: 18px; background: #f2f4f3; color: #778587; font-size: 8px; font-weight: 700; }
 .care-status.pending { background: #fff5e8; color: #a06c2f; }
+.care-status.waitlisted { background: #f0edff; color: #6650a4; }
 .care-status.admitted { background: #eaf6ef; color: #31734e; }
 .care-status.rejected { background: #fff0ed; color: #a13c2f; }
 .care-status.discharged { background: #edf3f7; color: #527182; }

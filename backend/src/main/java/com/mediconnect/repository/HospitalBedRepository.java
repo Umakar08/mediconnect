@@ -14,6 +14,7 @@ public interface HospitalBedRepository extends JpaRepository<HospitalBed, Long> 
     boolean existsByBedCodeIgnoreCase(String bedCode);
     List<HospitalBed> findAllByOrderByWardAscBedCodeAsc();
     List<HospitalBed> findByStatusOrderByWardAscBedCodeAsc(BedStatus status);
+    List<HospitalBed> findByBedTypeIgnoreCaseAndStatusOrderByBedCodeAsc(String bedType, BedStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select bed from HospitalBed bed where bed.id = :id")
